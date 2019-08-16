@@ -156,50 +156,6 @@ for i in range(2, ws1.max_row):
                 pass
         else:
             break
-# def search(input_str):
-#     '''
-#     根据问题查询对应的公文条例
-#     :param input_str:
-#     :return:
-#     '''
-#     seg_result = jieba.lcut(input_str)
-#     print(seg_result)
-#     answer_ = '|'
-#     answer_file = '您好！'
-#     max_len = 0.8
-#     max_pos = 0
-#     pre_result = []
-#     seg_result = set(seg_result)
-#     for sin in list(seg_result):
-#         if sin in stopwords:
-#             try:
-#                 seg_result.remove(sin)
-#             except KeyError:
-#                 pass
-#     # print(seg_result)
-#     for feature in feature_matrix:
-#         reference = 0
-#         common_part = []
-#         for word in seg_result:
-#             reference = feature[2].get(word, 0) + reference
-#             if word in feature[2].keys():
-#                 common_part.append(word)
-#
-#         if reference > 0.1:
-#             # if len(common_part)/(len(feature)-2) > max_len:
-#             if reference > max_pos:
-#                 max_pos = reference
-#                 pre_result.append([feature, reference])
-#
-#     for feature_ in pre_result:
-#         if feature_[1] > 0.8*max_pos:
-#             # if feature_[2] > 0.7:
-#             result_ = search_title(feature_[0])
-#             answer_ = answer_ + result_[0]+'|'+result_[1]+'|'
-#             regular = "根据"+'《'+result_[0]+'》'+"的相关规定"
-#             answer_file = answer_file+regular+doc_dict[result_[0]][result_[1]]['content']
-#     return answer_file+answer_
-#
 
 
 def search(input_str):
