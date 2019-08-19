@@ -1,6 +1,7 @@
 import openpyxl  # 导入用来操作xlsx的库
 import jieba  # 导入用来分词的库
 from sys import argv
+import numpy as np
 '''
     获取用户问题及相关的文件
 '''
@@ -11,7 +12,7 @@ stopwords = ['你好', '请问', '，', '的', '-', ' 需要', '您好', '了解
              '没有', '>', '找到', '成都市', ' 可否', '？', '我', '没有', '一直', '都在', '吗', '我能', '都', '，',
              '尊敬', '本人', '_', '在', '年', '是', ' ', '将', '说', '用', '\n', '今年', '月', '需要', '日',
              '重庆', '2018', '给', '某', '1', '2', '3', '4', '5', '6', '7', '8', '没', '以后', '了',
-             '刷', '深圳', '成华区', '哪些', '！', '能', '。']
+             '刷', '深圳', '成华区', '哪些', '！', '能', '。', '\r', '呢', '或者', '请', '有']
 # 导入训练集文件
 wb1 = openpyxl.load_workbook(r"data\训练集.xlsx")
 # 获取活跃的sheet
@@ -52,7 +53,7 @@ def count_num(jieba_result, count_dict):
     return count_dict
 
 
-def get_distance(array=[], word1='', word2=''):
+def get_distance(array, word1='', word2=''):
     '''
     获取输入字符串中的任意两词语之间的距离
     :param array:
@@ -82,6 +83,7 @@ def find_doc(a):
     return result
 
 
+
 def update_feature(feature_list, update_dict):
     '''
     特征提取之后更新公文条例的feature
@@ -92,15 +94,14 @@ def update_feature(feature_list, update_dict):
     result1 = doc_dict.get(list(doc_dict.keys())[feature_list[0]])
     result2 = result1.get(list(result1.keys())[feature_list[1]])
     result2['feature'][2].update(update_dict)
-    # print(result2['feature'])
 
 
 def function(a, b):
     '''
-    根据文件名和条例名查询内容
-    :param a:
-    :param b:
-    :return:
+        根据文件名和条例名查询内容
+        :param a:
+        :param b:
+        :return:
     '''
     a, b = str(a), str(b)
     a = a.lstrip()
@@ -138,9 +139,12 @@ def remove_kuohao(input_str=''):
 
 for i in range(2, ws1.max_row):
     question = ws1["B"+str(i)].value
+    for stopword in stopwords:
+        question = question.replace(stopword, '')
     if question is None:
         break
-    words = jieba.lcut(question)
+    words = jieba.cut(question)
+    words = set(words)
     for j in range(0, len(row_index), 2):
         if ws1[row_index[j]+str(i)].value is not None:
             doc = ws1[row_index[j]+str(i)].value       # 获取文件名
@@ -158,24 +162,47 @@ for i in range(2, ws1.max_row):
             break
 
 
+def result_deal(result):
+    '''
+    # 去除答案中的'\r','\n',' '
+    :param result:
+    :return:
+    '''
+    result = result.replace('\r', '')
+    result = result.replace('\n', '')
+    result = result.replace(' ', '')
+    result = result.strip('|')
+    return result
+
+
+def bubble_sort(arry):
+    '''
+    @ 冒泡排序算法
+    :param arry:
+    :return:
+    '''
+    n = len(arry)                   #获得数组的长度
+    for i in range(n):
+        for j in range(1,n-i):
+            if  arry[j-1][1] < arry[j][1] :       #如果前者比后者大
+                arry[j-1],arry[j] = arry[j],arry[j-1]      #则交换两者
+    return arry
+
+
 def search(input_str):
     '''
     根据问题查询对应的公文条例
     :param input_str:
     :return:
     '''
-    seg_result = jieba.lcut(input_str)
+    seg_result = jieba.cut(input_str)
     answer_ = '|'
-    answer_file = '您好！'
+    answer_file = input_str + '|' + '您好！'
     max_pos = 0
+    reference_2 = 0
     pre_result = []
-    seg_result = set(seg_result)
-    for sin in list(seg_result):
-        if sin in stopwords:
-            try:
-                seg_result.remove(sin)
-            except KeyError:
-                pass
+    seg_result = list(set(seg_result))
+    question_length = len(seg_result)
     for feature in feature_matrix:
         reference = 0
         common_part = []
@@ -183,18 +210,27 @@ def search(input_str):
             reference = feature[2].get(word, 0) + reference
             if word in feature[2].keys():
                 common_part.append(word)
-
         if reference > 0.1:
-            if reference > max_pos:
-                max_pos = reference
-            pre_result.append([feature, reference])
+            if len(common_part) > 0.5*question_length:
+                if reference > max_pos:
+                    max_pos = reference
+                    if reference*len(common_part) > reference_2:
+                        reference_2 = reference*len(common_part)
+                pre_result.append([feature, reference*len(common_part)])
+    wait_sort = []
     for feature_ in pre_result:
-        if feature_[1] > 0.9*max_pos:
+        if feature_[1] > 0.95*reference_2:
             result_ = search_title(feature_[0])
-            answer_ = answer_ + result_[0]+'|'+result_[1]+'|'
-            regular = "根据"+'《'+result_[0]+'》'+"的相关规定"
-            answer_file = answer_file+regular+doc_dict[result_[0]][result_[1]]['content']
-    return answer_file+answer_
+            # print(result_,feature_[1])
+            wait_sort.append([result_, feature_[1]])
+    wait_sort = bubble_sort(wait_sort)
+    for project in wait_sort:
+        # print(project[0], project[1])
+        answer_ = answer_ + str(project[0][0])+'|'+str(project[0][1])+'|'
+        regular = "根据"+'《'+project[0][0]+'》'+"的相关规定"
+        answer_file = answer_file+regular+doc_dict[project[0][0]][project[0][1]]['content']
+        consequence = result_deal(answer_file+answer_)
+    return consequence
 
 
 def search_title(a):
@@ -224,7 +260,6 @@ if __name__ == "__main__":
             add_all = sum(two.values())
             for item in two.keys():
                 two[item] = two.get(item) / add_all
-            # print(two)
             doc_dict[m][n]['feature'][2] = two
             feature_matrix.append(doc_dict[m][n]['feature'])
             matrix_row = matrix_row + 1
@@ -232,16 +267,23 @@ if __name__ == "__main__":
     wb.close()
     test = argv[1]
     with open('result.txt', 'w', encoding='utf-8') as res:
-        with open(test, 'r') as que:
+        with open(test, 'r', encoding='utf-8') as que:
             questions = que.readlines()
             for question in questions:
                 if question is not None:
-                    # print(question)
+                    # print('问题是', question)
+                    for stopword in stopwords:
+                        question = question.replace(stopword, '')
                     answer = search(question)
-                    # print(answer)
-                    res.writelines(answer)
-                    res.write('\n\n')
+                    res.write(answer)
+                    res.write('\n')
                 else:
                     break
+                
+            
+        
+    
+
+
 
 
